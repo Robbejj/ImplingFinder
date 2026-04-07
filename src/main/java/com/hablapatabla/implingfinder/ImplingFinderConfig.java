@@ -76,6 +76,14 @@ public interface ImplingFinderConfig extends Config
 
     @ConfigItem(
             position = 6,
+            keyName = "ignorePuroPuro",
+            name = "Ignore Puro Puro",
+            description = "Filters out implings located in Puro Puro"
+    )
+    default boolean ignorePuroPuro() { return false; }
+
+    @ConfigItem(
+            position = 7,
             keyName = "splashSeen",
             name = "I've seen the splash page",
             description = "This plugin has been opened before"
@@ -84,7 +92,7 @@ public interface ImplingFinderConfig extends Config
 
     @ConfigItem(
             keyName = "issue",
-            position = 7,
+            position = 8,
             name = "Got an issue?",
             description = "Go to this link if you have an issue or want to request a feature. I probably won't do it, but it's worth a shot!"
     )

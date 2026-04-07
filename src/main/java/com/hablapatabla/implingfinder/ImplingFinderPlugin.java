@@ -4,6 +4,7 @@ import com.google.gson.Gson;
 import com.google.inject.Provides;
 import com.hablapatabla.implingfinder.model.ImplingFinderData;
 import com.hablapatabla.implingfinder.model.ImplingFinderEnum;
+import com.hablapatabla.implingfinder.model.ImplingFinderRegion;
 import com.hablapatabla.implingfinder.model.ImplingFinderWorldMapPoint;
 import com.hablapatabla.implingfinder.ui.ImplingFinderPanel;
 import lombok.AccessLevel;
@@ -21,6 +22,7 @@ import net.runelite.client.eventbus.Subscribe;
 import net.runelite.client.events.ConfigChanged;
 import net.runelite.client.game.ItemManager;
 import net.runelite.client.game.WorldService;
+import net.runelite.client.callback.ClientThread;
 import net.runelite.client.plugins.Plugin;
 import net.runelite.client.plugins.PluginDescriptor;
 import net.runelite.client.task.Schedule;
@@ -59,6 +61,9 @@ public class ImplingFinderPlugin extends Plugin {
 
     @Inject
     private Client client;
+
+    @Inject
+    private ClientThread clientThread;
 
     @Inject
     private Gson gson;
@@ -217,20 +222,22 @@ public class ImplingFinderPlugin extends Plugin {
     }
 
     public void addMapPoints(WorldPoint... points) {
-        WorldPoint p = client.getLocalPlayer().getWorldLocation();
-        if (p == null)
-            return;
+        clientThread.invokeLater(() -> {
+            WorldPoint p = client.getLocalPlayer().getWorldLocation();
+            if (p == null)
+                return;
 
-        if (mapPointSet) {
-            mapPointSet = false;
+            if (mapPointSet) {
+                mapPointSet = false;
+                worldMapPointManager.removeIf(ImplingFinderWorldMapPoint.class::isInstance);
+                return;
+            }
+
+            mapPointSet = true;
             worldMapPointManager.removeIf(ImplingFinderWorldMapPoint.class::isInstance);
-            return;
-        }
-
-        mapPointSet = true;
-        worldMapPointManager.removeIf(ImplingFinderWorldMapPoint.class::isInstance);
-        for (final WorldPoint point : points)
-            worldMapPointManager.add(new ImplingFinderWorldMapPoint(point, this));
+            for (final WorldPoint point : points)
+                worldMapPointManager.add(new ImplingFinderWorldMapPoint(point, this));
+        });
     }
 
     @Schedule(
@@ -268,7 +275,14 @@ public class ImplingFinderPlugin extends Plugin {
     }
 
     public void updatePanels() {
-        Collections.sort(remotelyFetchedImplings, Collections.reverseOrder());
-        SwingUtilities.invokeLater(() -> panel.populateNpcs(remotelyFetchedImplings));
+        List<ImplingFinderData> toDisplay = remotelyFetchedImplings;
+        if (config.ignorePuroPuro()) {
+            toDisplay = remotelyFetchedImplings.stream()
+                    .filter(d -> new WorldPoint(d.getXcoord(), d.getYcoord(), d.getPlane()).getRegionID() != ImplingFinderRegion.REGION_PURO_PURO.getRegionIds()[0])
+                    .collect(java.util.stream.Collectors.toList());
+        }
+        Collections.sort(toDisplay, Collections.reverseOrder());
+        final List<ImplingFinderData> displayList = toDisplay;
+        SwingUtilities.invokeLater(() -> panel.populateNpcs(displayList));
     }
 }
